@@ -79,68 +79,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [activeDuplicateModal, setActiveDuplicateModal] = useState<{ title: string; notices: DuplicateNotice[] } | null>(null);
 
-  // Load from localStorage on client mount (with demo data cleanup)
+  // Load from localStorage on client mount (with complete session reset)
   useEffect(() => {
     try {
+      // ONE-TIME FORCED PURGE OF ALL PAST SESSIONS & TEST DATA
+      const sessionResetDone = localStorage.getItem('gsh_session_reset_v2');
+      if (!sessionResetDone) {
+        localStorage.removeItem('gsh_active_session');
+        localStorage.removeItem('gsh_auth_user');
+        localStorage.removeItem('gsh_users_db');
+        localStorage.removeItem('gsh_user_profile');
+        localStorage.removeItem('gsh_pinned_codes');
+        localStorage.removeItem('gsh_applications');
+        localStorage.removeItem('gsh_documents');
+        localStorage.setItem('gsh_session_reset_v2', 'true');
+        setCurrentUser(null);
+        setRegisteredUsers([]);
+        setPinnedShortCodes([]);
+        setApplications([]);
+        setDocuments([]);
+        return;
+      }
+
       // 1. Registered Users database inside website
       const savedUsers = localStorage.getItem('gsh_users_db');
       if (savedUsers) {
         const parsedUsers: RegisteredUser[] = JSON.parse(savedUsers);
-        // Filter out any old demo users
-        const cleanedUsers = parsedUsers.filter(u => u.userId !== 'student123');
-        setRegisteredUsers(cleanedUsers);
-        localStorage.setItem('gsh_users_db', JSON.stringify(cleanedUsers));
+        setRegisteredUsers(parsedUsers);
       }
 
-      // 2. Active Session
+      // 2. Active Session (Only if explicitly logged in by user)
       const savedSession = localStorage.getItem('gsh_active_session');
       if (savedSession) {
         const parsedSession: AuthUser = JSON.parse(savedSession);
-        if (parsedSession.userId !== 'student123') {
-          setCurrentUser(parsedSession);
-        } else {
-          localStorage.removeItem('gsh_active_session');
-        }
+        setCurrentUser(parsedSession);
+      } else {
+        setCurrentUser(null);
       }
 
       // 3. User Profile
       const savedProfile = localStorage.getItem('gsh_user_profile');
       if (savedProfile) {
         const parsedProfile = JSON.parse(savedProfile);
-        if (parsedProfile.id !== 'user-demo-1') {
-          setUserProfile(parsedProfile);
-        }
+        setUserProfile(parsedProfile);
       }
 
-      // 4. Clean out any old demo pins
+      // 4. Saved Pins
       const savedPins = localStorage.getItem('gsh_pinned_codes');
       if (savedPins) {
         const parsedPins: string[] = JSON.parse(savedPins);
-        // If it was just the legacy default ['DAAD', 'EMJM'], clear it
-        if (parsedPins.length === 2 && parsedPins.includes('DAAD') && parsedPins.includes('EMJM')) {
-          setPinnedShortCodes([]);
-          localStorage.removeItem('gsh_pinned_codes');
-        } else {
-          setPinnedShortCodes(parsedPins);
-        }
+        setPinnedShortCodes(parsedPins);
       }
 
-      // 5. Clean out any old demo applications
+      // 5. Applications
       const savedApps = localStorage.getItem('gsh_applications');
       if (savedApps) {
         const parsedApps: ApplicationCard[] = JSON.parse(savedApps);
-        const nonDemoApps = parsedApps.filter(app => !['app-1', 'app-2', 'app-3'].includes(app.id));
-        setApplications(nonDemoApps);
-        localStorage.setItem('gsh_applications', JSON.stringify(nonDemoApps));
+        setApplications(parsedApps);
       }
 
-      // 6. Clean out any old demo documents
+      // 6. Documents
       const savedDocs = localStorage.getItem('gsh_documents');
       if (savedDocs) {
         const parsedDocs: DocumentItem[] = JSON.parse(savedDocs);
-        const nonDemoDocs = parsedDocs.filter(doc => !['doc-1', 'doc-2', 'doc-3'].includes(doc.id));
-        setDocuments(nonDemoDocs);
-        localStorage.setItem('gsh_documents', JSON.stringify(nonDemoDocs));
+        setDocuments(parsedDocs);
       }
 
       const savedNews = localStorage.getItem('gsh_seen_news');
