@@ -127,20 +127,15 @@ export interface DocumentItem {
 
 export interface AuthUser {
   id: string;
-  email: string;
+  userId: string; // unique student username or ID
   fullName: string;
-  avatarUrl?: string;
-  provider: 'google' | 'email';
   createdAt: string;
 }
 
-export interface RegisteredAccount {
+export interface RegisteredUser {
   id: string;
-  identifier: string; // username / UID or email
-  email: string;
+  userId: string; // unique student username or ID
   fullName: string;
-  password?: string;
-  avatarUrl?: string;
-  provider: 'google' | 'email';
+  password: string;
   createdAt: string;
 }

@@ -164,24 +164,16 @@ export default function Navbar() {
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                   className="flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition-all shadow-2xs group"
                 >
-                  {currentUser.avatarUrl ? (
-                    <img 
-                      src={currentUser.avatarUrl} 
-                      alt={currentUser.fullName}
-                      className="w-7 h-7 rounded-full object-cover border border-slate-200" 
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-bold">
-                      {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'U'}
-                    </div>
-                  )}
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+                    {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : currentUser.userId.charAt(0).toUpperCase()}
+                  </div>
 
                   <div className="hidden sm:block text-left">
                     <p className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors leading-tight">
-                      {currentUser.fullName || 'Student'}
+                      {currentUser.fullName || currentUser.userId}
                     </p>
                     <p className="text-[10px] text-slate-500 font-medium leading-none">
-                      CGPA: {userProfile.cgpa.toFixed(2)}
+                      @{currentUser.userId} • CGPA: {userProfile.cgpa.toFixed(2)}
                     </p>
                   </div>
 
@@ -193,10 +185,10 @@ export default function Navbar() {
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 text-xs animate-in fade-in duration-100">
                     <div className="px-4 py-2.5 border-b border-slate-100">
                       <p className="font-bold text-slate-900 truncate">{currentUser.fullName}</p>
-                      <p className="text-[11px] text-slate-500 truncate">{currentUser.email}</p>
+                      <p className="text-[11px] text-blue-600 font-mono truncate">@{currentUser.userId}</p>
                       <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        <span>Signed in via {currentUser.provider === 'google' ? 'Google' : 'User ID'}</span>
+                        <span>Authenticated Session</span>
                       </div>
                     </div>
 
