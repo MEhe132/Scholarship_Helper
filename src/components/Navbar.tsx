@@ -173,7 +173,7 @@ export default function Navbar() {
                       {currentUser.fullName || currentUser.userId}
                     </p>
                     <p className="text-[10px] text-slate-500 font-medium leading-none">
-                      @{currentUser.userId} • CGPA: {userProfile.cgpa.toFixed(2)}
+                      @{currentUser.userId} • {userProfile.cgpa > 0 ? `CGPA: ${userProfile.cgpa.toFixed(2)}` : 'Profile: Unset'}
                     </p>
                   </div>
 
