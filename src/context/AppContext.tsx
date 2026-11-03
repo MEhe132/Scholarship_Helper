@@ -1,10 +1,21 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserProfile, ApplicationCard, DocumentItem, Authority, DuplicateNotice, ApplicationStatus } from '../lib/types';
+import { UserProfile, ApplicationCard, DocumentItem, Authority, DuplicateNotice, ApplicationStatus, AuthUser } from '../lib/types';
 import { authoritiesData } from '../data/authoritiesData';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface AppContextType {
+  currentUser: AuthUser | null;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+  authModalMode: 'login' | 'signup';
+  setAuthModalMode: (mode: 'login' | 'signup') => void;
+  loginWithGoogle: () => Promise<void>;
+  loginWithPassword: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithPassword: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
+
   userProfile: UserProfile;
   updateProfile: (updated: Partial<UserProfile>) => void;
   pinnedShortCodes: string[];
@@ -114,6 +125,10 @@ const defaultDocuments: DocumentItem[] = [
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
+
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [pinnedShortCodes, setPinnedShortCodes] = useState<string[]>(['DAAD', 'EMJM']);
   const [applications, setApplications] = useState<ApplicationCard[]>(defaultApplications);
@@ -125,6 +140,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Load from localStorage on client mount
   useEffect(() => {
     try {
+      const savedUser = localStorage.getItem('gsh_auth_user');
+      if (savedUser) {
+        setCurrentUser(JSON.parse(savedUser));
+      }
+
       const savedProfile = localStorage.getItem('gsh_user_profile');
       if (savedProfile) setUserProfile(JSON.parse(savedProfile));
 
@@ -139,10 +159,189 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       const savedNews = localStorage.getItem('gsh_seen_news');
       if (savedNews) setSeenNewsIds(JSON.parse(savedNews));
+
+      // Listen to live Supabase session if configured
+      if (isSupabaseConfigured() && supabase) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            const sbUser: AuthUser = {
+              id: session.user.id,
+              email: session.user.email || '',
+              fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              avatarUrl: session.user.user_metadata?.avatar_url,
+              provider: (session.user.app_metadata?.provider as any) || 'email',
+              createdAt: session.user.created_at,
+            };
+            setCurrentUser(sbUser);
+            localStorage.setItem('gsh_auth_user', JSON.stringify(sbUser));
+          }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            const sbUser: AuthUser = {
+              id: session.user.id,
+              email: session.user.email || '',
+              fullName: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+              avatarUrl: session.user.user_metadata?.avatar_url,
+              provider: (session.user.app_metadata?.provider as any) || 'email',
+              createdAt: session.user.created_at,
+            };
+            setCurrentUser(sbUser);
+            localStorage.setItem('gsh_auth_user', JSON.stringify(sbUser));
+          } else {
+            setCurrentUser(null);
+            localStorage.removeItem('gsh_auth_user');
+          }
+        });
+
+        return () => subscription.unsubscribe();
+      }
     } catch (e) {
-      console.warn('LocalStorage error:', e);
+      console.warn('Initialization error:', e);
     }
   }, []);
+
+  const loginWithGoogle = async () => {
+    if (isSupabaseConfigured() && supabase) {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+        },
+      });
+      if (error) {
+        throw error;
+      }
+      return;
+    }
+
+    // Demo Mode Google Login Simulation
+    const demoGoogleUser: AuthUser = {
+      id: `google-${Date.now()}`,
+      email: 'mhbhuiyan132@gmail.com',
+      fullName: 'Mehedi Hasan',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+      provider: 'google',
+      createdAt: new Date().toISOString(),
+    };
+
+    setCurrentUser(demoGoogleUser);
+    localStorage.setItem('gsh_auth_user', JSON.stringify(demoGoogleUser));
+
+    // Also update profile name if default
+    updateProfile({ fullName: demoGoogleUser.fullName });
+  };
+
+  const loginWithPassword = async (identifier: string, password: string) => {
+    if (!identifier || !password) {
+      return { success: false, error: 'Please enter both User ID/Email and password.' };
+    }
+
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: identifier,
+        password: password,
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        const authedUser: AuthUser = {
+          id: data.user.id,
+          email: data.user.email || identifier,
+          fullName: data.user.user_metadata?.full_name || identifier.split('@')[0],
+          provider: 'email',
+          createdAt: data.user.created_at,
+        };
+        setCurrentUser(authedUser);
+        localStorage.setItem('gsh_auth_user', JSON.stringify(authedUser));
+      }
+      return { success: true };
+    }
+
+    // Demo Mode Password Login Simulation
+    const namePart = identifier.includes('@') ? identifier.split('@')[0] : identifier;
+    const demoUser: AuthUser = {
+      id: `user-${Date.now()}`,
+      email: identifier.includes('@') ? identifier : `${identifier}@student.university.edu`,
+      fullName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+      provider: 'email',
+      createdAt: new Date().toISOString(),
+    };
+
+    setCurrentUser(demoUser);
+    localStorage.setItem('gsh_auth_user', JSON.stringify(demoUser));
+    updateProfile({ fullName: demoUser.fullName });
+
+    return { success: true };
+  };
+
+  const registerWithPassword = async (email: string, password: string, fullName: string) => {
+    if (!email || !password || !fullName) {
+      return { success: false, error: 'All fields are required for sign up.' };
+    }
+
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        const authedUser: AuthUser = {
+          id: data.user.id,
+          email: data.user.email || email,
+          fullName: fullName,
+          provider: 'email',
+          createdAt: data.user.created_at,
+        };
+        setCurrentUser(authedUser);
+        localStorage.setItem('gsh_auth_user', JSON.stringify(authedUser));
+      }
+      return { success: true };
+    }
+
+    // Demo Mode Registration
+    const newUser: AuthUser = {
+      id: `user-${Date.now()}`,
+      email,
+      fullName,
+      provider: 'email',
+      createdAt: new Date().toISOString(),
+    };
+
+    setCurrentUser(newUser);
+    localStorage.setItem('gsh_auth_user', JSON.stringify(newUser));
+    updateProfile({ fullName });
+
+    return { success: true };
+  };
+
+  const logout = async () => {
+    if (isSupabaseConfigured() && supabase) {
+      await supabase.auth.signOut();
+    }
+    setCurrentUser(null);
+    localStorage.removeItem('gsh_auth_user');
+  };
 
   const updateProfile = (updated: Partial<UserProfile>) => {
     setUserProfile((prev) => {
@@ -234,6 +433,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider
       value={{
+        currentUser,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        authModalMode,
+        setAuthModalMode,
+        loginWithGoogle,
+        loginWithPassword,
+        registerWithPassword,
+        logout,
+
         userProfile,
         updateProfile,
         pinnedShortCodes,

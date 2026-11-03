@@ -124,3 +124,12 @@ export interface DocumentItem {
   uploadedAt: string;
   notes?: string;
 }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  fullName: string;
+  avatarUrl?: string;
+  provider: 'google' | 'email';
+  createdAt: string;
+}

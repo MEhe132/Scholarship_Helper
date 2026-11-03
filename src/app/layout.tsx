@@ -4,6 +4,7 @@ import { AppProvider } from '../context/AppContext';
 import Navbar from '../components/Navbar';
 import ProfileModal from '../components/ProfileModal';
 import DuplicateNoticeModal from '../components/DuplicateNoticeModal';
+import AuthModal from '../components/AuthModal';
 
 export const metadata: Metadata = {
   title: 'GlobalScholar Hub | CS Higher Study Abroad & Scholarship Portal',
@@ -36,6 +37,7 @@ export default function RootLayout({
           </main>
           
           {/* Global Modals */}
+          <AuthModal />
           <ProfileModal />
           <DuplicateNoticeModal />
 
