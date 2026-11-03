@@ -10,6 +10,15 @@ export const metadata: Metadata = {
   title: 'GlobalScholar Hub | CS Higher Study Abroad & Scholarship Portal',
   description: 'Verified scholarship database, country work rights, application Kanban tracker, and document vault for undergraduate students aiming for higher studies abroad.',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '32x32' },
+    ],
+    apple: [
+      { url: '/icon.svg' },
+    ],
+  },
 };
 
 export const viewport: Viewport = {

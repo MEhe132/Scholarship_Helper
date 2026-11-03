@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1" stdDeviation="0.8" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded Squircle Background -->
+  <rect width="32" height="32" rx="8" fill="url(#grad)" />
+
+  <!-- Graduation Cap -->
+  <g filter="url(#shadow)">
+    <!-- Top Diamond / Mortarboard -->
+    <polygon points="16,6 27,12 16,18 5,12" fill="#ffffff" />
+    
+    <!-- Cap Base / Underneath -->
+    <path d="M9 14.5v4.5c0 2.2 3.1 4 7 4s7-1.8 7-4.5v-4.5" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    
+    <!-- Gold Tassel -->
+    <path d="M25 12.8v5.5" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" />
+    <circle cx="25" cy="19" r="1.2" fill="#f59e0b" />
+  </g>
+</svg>
