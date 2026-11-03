@@ -205,7 +205,7 @@ export default function Navbar() {
                           <span>Academic Profile & Scores</span>
                         </span>
                         <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                          {userProfile.cgpa.toFixed(2)}
+                          {userProfile.cgpa > 0 ? userProfile.cgpa.toFixed(2) : 'Set'}
                         </span>
                       </button>
 

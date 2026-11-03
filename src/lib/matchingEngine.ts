@@ -9,6 +9,16 @@ export interface MatchResult {
 }
 
 export function calculateAuthorityMatch(authority: Authority, profile: UserProfile): MatchResult {
+  if (!profile.cgpa || profile.cgpa <= 0) {
+    return {
+      score: 60,
+      isEligible: true,
+      tag: 'Eligible',
+      reasons: ['Set your CGPA in profile to view personalized match scoring'],
+      warnings: [],
+    };
+  }
+
   let score = 50; // baseline
   const reasons: string[] = [];
   const warnings: string[] = [];

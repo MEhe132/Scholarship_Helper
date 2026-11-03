@@ -7,14 +7,14 @@ import { useApp } from '../context/AppContext';
 export default function ProfileModal() {
   const { userProfile, updateProfile, isProfileModalOpen, setIsProfileModalOpen } = useApp();
 
-  const [fullName, setFullName] = useState(userProfile.fullName);
-  const [currentDegree, setCurrentDegree] = useState(userProfile.currentDegree);
-  const [cgpa, setCgpa] = useState(userProfile.cgpa.toString());
-  const [ieltsScore, setIeltsScore] = useState(userProfile.ieltsScore?.toString() || '7.0');
-  const [greQuant, setGreQuant] = useState(userProfile.greQuant?.toString() || '164');
-  const [fundingPreference, setFundingPreference] = useState(userProfile.fundingPreference);
-  const [targetIntake, setTargetIntake] = useState(userProfile.targetIntake);
-  const [preferredCountries, setPreferredCountries] = useState<string[]>(userProfile.preferredCountries);
+  const [fullName, setFullName] = useState(userProfile.fullName || '');
+  const [currentDegree, setCurrentDegree] = useState(userProfile.currentDegree || 'BSc in Computer Science');
+  const [cgpa, setCgpa] = useState(userProfile.cgpa > 0 ? userProfile.cgpa.toString() : '');
+  const [ieltsScore, setIeltsScore] = useState(userProfile.ieltsScore?.toString() || '');
+  const [greQuant, setGreQuant] = useState(userProfile.greQuant?.toString() || '');
+  const [fundingPreference, setFundingPreference] = useState(userProfile.fundingPreference || 'both');
+  const [targetIntake, setTargetIntake] = useState(userProfile.targetIntake || 'Fall 2026');
+  const [preferredCountries, setPreferredCountries] = useState<string[]>(userProfile.preferredCountries || []);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   if (!isProfileModalOpen) return null;
@@ -29,16 +29,16 @@ export default function ProfileModal() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedCgpa = parseFloat(cgpa) || 3.5;
-    const parsedIelts = parseFloat(ieltsScore) || 7.0;
-    const parsedGre = parseInt(greQuant) || 160;
+    const parsedCgpa = parseFloat(cgpa) || 0;
+    const parsedIelts = ieltsScore ? parseFloat(ieltsScore) : undefined;
+    const parsedGre = greQuant ? parseInt(greQuant) : undefined;
 
     updateProfile({
-      fullName,
+      fullName: fullName.trim(),
       currentDegree,
-      cgpa: Math.min(Math.max(parsedCgpa, 1.0), 4.0),
-      ieltsScore: Math.min(Math.max(parsedIelts, 0), 9.0),
-      greQuant: Math.min(Math.max(parsedGre, 130), 170),
+      cgpa: parsedCgpa > 0 ? Math.min(Math.max(parsedCgpa, 1.0), 4.0) : 0,
+      ieltsScore: parsedIelts ? Math.min(Math.max(parsedIelts, 0), 9.0) : undefined,
+      greQuant: parsedGre ? Math.min(Math.max(parsedGre, 130), 170) : undefined,
       fundingPreference: fundingPreference as any,
       targetIntake,
       preferredCountries

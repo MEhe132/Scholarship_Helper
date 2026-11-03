@@ -26,7 +26,7 @@ const columns: { status: ApplicationStatus; title: string; color: string; badge:
 ];
 
 export default function ApplicationTrackerPage() {
-  const { applications, updateApplicationStatus, deleteApplication } = useApp();
+  const { applications, updateApplicationStatus, deleteApplication, addCustomApplication } = useApp();
   const [newUniName, setNewUniName] = useState('');
   const [newProgramName, setNewProgramName] = useState('');
   const [newCountry, setNewCountry] = useState('Germany');
@@ -37,7 +37,6 @@ export default function ApplicationTrackerPage() {
     e.preventDefault();
     if (!newUniName || !newProgramName) return;
 
-    // Use Context to save
     const newCard: ApplicationCard = {
       id: `app-${Date.now()}`,
       scholarshipTitle: newProgramName,
@@ -46,15 +45,14 @@ export default function ApplicationTrackerPage() {
       countryFlag: newCountry === 'Germany' ? '🇩🇪' : newCountry === 'USA' ? '🇺🇸' : newCountry === 'Italy' ? '🇮🇹' : '🌐',
       status: 'shortlisted',
       deadline: newDeadline,
-      notes: 'Manually added custom application.',
+      notes: 'Custom university application',
       updatedAt: 'Just now'
     };
 
-    // Save
-    const existing = JSON.parse(localStorage.getItem('gsh_applications') || '[]');
-    const next = [newCard, ...existing];
-    localStorage.setItem('gsh_applications', JSON.stringify(next));
-    window.location.reload();
+    addCustomApplication(newCard);
+    setNewUniName('');
+    setNewProgramName('');
+    setIsAddModalOpen(false);
   };
 
   return (

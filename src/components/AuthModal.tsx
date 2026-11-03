@@ -370,17 +370,6 @@ export default function AuthModal() {
                 </button>
               </div>
 
-              {/* Demo accounts hint */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
-                <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                  <span className="font-semibold text-slate-800">Pre-seeded Test Account:</span>
-                  <div className="mt-0.5 text-slate-500">
-                    User ID: <code className="bg-white px-1 py-0.5 rounded border font-bold text-blue-700">student123</code> • Password: <code className="bg-white px-1 py-0.5 rounded border font-bold text-blue-700">password123</code>
-                  </div>
-                </div>
-              </div>
-
             </form>
           )}
 

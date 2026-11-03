@@ -44,9 +44,15 @@ export default function HomePage() {
           <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 border-t sm:border-t-0 sm:border-l border-white/10 pt-3 sm:pt-0 sm:pl-6 shrink-0">
             <div className="text-left sm:text-right">
               <span className="text-[11px] text-slate-400 block">Your Profile CGPA</span>
-              <span className="text-lg font-bold text-emerald-400">
-                {userProfile.cgpa.toFixed(2)} / {userProfile.cgpaScale.toFixed(2)}
-              </span>
+              {userProfile.cgpa > 0 ? (
+                <span className="text-lg font-bold text-emerald-400">
+                  {userProfile.cgpa.toFixed(2)} / {userProfile.cgpaScale.toFixed(2)}
+                </span>
+              ) : (
+                <span className="text-sm font-semibold text-amber-300">
+                  Not set yet
+                </span>
+              )}
             </div>
 
             <button
@@ -54,7 +60,7 @@ export default function HomePage() {
               className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold border border-white/20 transition-all flex items-center gap-1.5 backdrop-blur-xs"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Adjust Scores</span>
+              <span>{userProfile.cgpa > 0 ? 'Adjust Scores' : 'Set Your CGPA'}</span>
             </button>
           </div>
         </div>

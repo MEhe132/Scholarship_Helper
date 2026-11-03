@@ -25,6 +25,7 @@ interface AppContextType {
   isPinned: (shortCode: string) => boolean;
   applications: ApplicationCard[];
   addToTracker: (authority: Authority, programName?: string) => void;
+  addCustomApplication: (card: ApplicationCard) => void;
   updateApplicationStatus: (id: string, status: ApplicationStatus) => void;
   deleteApplication: (id: string) => void;
   documents: DocumentItem[];
@@ -38,149 +39,109 @@ interface AppContextType {
   setActiveDuplicateModal: (modal: { title: string; notices: DuplicateNotice[] } | null) => void;
 }
 
-const initialRegisteredUsers: RegisteredUser[] = [
-  {
-    id: 'user-default-1',
-    userId: 'student123',
-    fullName: 'CS Undergrad (3rd Year)',
-    password: 'password123',
-    createdAt: '2026-11-01T10:00:00Z',
-  }
-];
+const initialRegisteredUsers: RegisteredUser[] = [];
 
 const defaultProfile: UserProfile = {
-  id: 'user-demo-1',
-  fullName: 'CS Undergrad (3rd Year)',
+  id: 'user-profile-default',
+  fullName: '',
   currentDegree: 'BSc in Computer Science',
-  currentMajor: 'Computer Science & Engineering',
-  cgpa: 3.50,
+  currentMajor: 'Computer Science',
+  cgpa: 0,
   cgpaScale: 4.00,
-  ieltsScore: 7.0,
-  greQuant: 164,
-  greVerbal: 154,
-  targetDegree: ['MSc', 'PhD', 'Direct PhD'],
-  preferredCountries: ['Germany', 'European Union', 'United States', 'Italy', 'South Korea'],
+  ieltsScore: undefined,
+  greQuant: undefined,
+  greVerbal: undefined,
+  targetDegree: ['MSc', 'PhD'],
+  preferredCountries: [],
   fundingPreference: 'both',
   expectedGraduationYear: 2026,
-  targetIntake: 'Fall 2026 / Spring 2027',
+  targetIntake: 'Fall 2026',
 };
 
-const defaultApplications: ApplicationCard[] = [
-  {
-    id: 'app-1',
-    authorityShortCode: 'DAAD',
-    scholarshipTitle: 'MSc Computer Science (Tuition-Free)',
-    universityName: 'Technical University of Munich (TUM)',
-    country: 'Germany',
-    countryFlag: '🇩🇪',
-    status: 'preparing',
-    deadline: '2026-05-31',
-    notes: 'Preparing VPD with Uni-Assist. Checking Werkstudent options in Munich tech ecosystem.',
-    updatedAt: '2 days ago'
-  },
-  {
-    id: 'app-2',
-    authorityShortCode: 'EMJM',
-    scholarshipTitle: 'EMJM BDMA (Big Data Management & Analytics)',
-    universityName: 'ULB Brussels & TU Eindhoven Consortium',
-    country: 'European Union',
-    countryFlag: '🇪🇺',
-    status: 'shortlisted',
-    deadline: '2026-01-15',
-    notes: 'Drafting SOP. Emphasizing final year database project.',
-    updatedAt: '1 day ago'
-  },
-  {
-    id: 'app-3',
-    authorityShortCode: 'DSU_ITALY',
-    scholarshipTitle: 'MSc Computer Science & Engineering (DSU Grant)',
-    universityName: 'Politecnico di Milano',
-    country: 'Italy',
-    countryFlag: '🇮🇹',
-    status: 'shortlisted',
-    deadline: '2026-02-28',
-    notes: 'Requested family composition and income certificates for ISEE-Parificato calculation.',
-    updatedAt: '3 days ago'
-  }
-];
+const defaultApplications: ApplicationCard[] = [];
 
-const defaultDocuments: DocumentItem[] = [
-  {
-    id: 'doc-1',
-    fileName: 'Academic_CV_CS_Candidate_2026.pdf',
-    fileCategory: 'cv',
-    fileSizeKb: 142,
-    fileUrl: '#',
-    uploadedAt: 'Today, 10:20 AM',
-    notes: '1-page LaTeX format targeting European & US CS labs.'
-  },
-  {
-    id: 'doc-2',
-    fileName: 'SOP_Draft_v2_DistributedSystems.docx',
-    fileCategory: 'sop',
-    fileSizeKb: 88,
-    fileUrl: '#',
-    uploadedAt: 'Yesterday, 03:45 PM',
-    notes: 'Tailored for German tuition-free universities and Erasmus BDMA.'
-  },
-  {
-    id: 'doc-3',
-    fileName: 'Undergrad_Transcript_Sem1-Sem5_Official.pdf',
-    fileCategory: 'transcript',
-    fileSizeKb: 340,
-    fileUrl: '#',
-    uploadedAt: '3 days ago',
-    notes: 'Official semester 1 to 5 grades. Current CGPA: 3.50/4.00.'
-  }
-];
+const defaultDocuments: DocumentItem[] = [];
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(initialRegisteredUsers);
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
   const [prefilledUserId, setPrefilledUserId] = useState('');
 
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
-  const [pinnedShortCodes, setPinnedShortCodes] = useState<string[]>(['DAAD', 'EMJM']);
-  const [applications, setApplications] = useState<ApplicationCard[]>(defaultApplications);
-  const [documents, setDocuments] = useState<DocumentItem[]>(defaultDocuments);
+  const [pinnedShortCodes, setPinnedShortCodes] = useState<string[]>([]);
+  const [applications, setApplications] = useState<ApplicationCard[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [seenNewsIds, setSeenNewsIds] = useState<string[]>([]);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
   const [activeDuplicateModal, setActiveDuplicateModal] = useState<{ title: string; notices: DuplicateNotice[] } | null>(null);
 
-  // Load from localStorage on client mount
+  // Load from localStorage on client mount (with demo data cleanup)
   useEffect(() => {
     try {
       // 1. Registered Users database inside website
       const savedUsers = localStorage.getItem('gsh_users_db');
       if (savedUsers) {
-        setRegisteredUsers(JSON.parse(savedUsers));
-      } else {
-        localStorage.setItem('gsh_users_db', JSON.stringify(initialRegisteredUsers));
+        const parsedUsers: RegisteredUser[] = JSON.parse(savedUsers);
+        // Filter out any old demo users
+        const cleanedUsers = parsedUsers.filter(u => u.userId !== 'student123');
+        setRegisteredUsers(cleanedUsers);
+        localStorage.setItem('gsh_users_db', JSON.stringify(cleanedUsers));
       }
 
       // 2. Active Session
       const savedSession = localStorage.getItem('gsh_active_session');
       if (savedSession) {
-        setCurrentUser(JSON.parse(savedSession));
+        const parsedSession: AuthUser = JSON.parse(savedSession);
+        if (parsedSession.userId !== 'student123') {
+          setCurrentUser(parsedSession);
+        } else {
+          localStorage.removeItem('gsh_active_session');
+        }
       }
 
       // 3. User Profile
       const savedProfile = localStorage.getItem('gsh_user_profile');
-      if (savedProfile) setUserProfile(JSON.parse(savedProfile));
+      if (savedProfile) {
+        const parsedProfile = JSON.parse(savedProfile);
+        if (parsedProfile.id !== 'user-demo-1') {
+          setUserProfile(parsedProfile);
+        }
+      }
 
-      // 4. Saved Data
+      // 4. Clean out any old demo pins
       const savedPins = localStorage.getItem('gsh_pinned_codes');
-      if (savedPins) setPinnedShortCodes(JSON.parse(savedPins));
+      if (savedPins) {
+        const parsedPins: string[] = JSON.parse(savedPins);
+        // If it was just the legacy default ['DAAD', 'EMJM'], clear it
+        if (parsedPins.length === 2 && parsedPins.includes('DAAD') && parsedPins.includes('EMJM')) {
+          setPinnedShortCodes([]);
+          localStorage.removeItem('gsh_pinned_codes');
+        } else {
+          setPinnedShortCodes(parsedPins);
+        }
+      }
 
+      // 5. Clean out any old demo applications
       const savedApps = localStorage.getItem('gsh_applications');
-      if (savedApps) setApplications(JSON.parse(savedApps));
+      if (savedApps) {
+        const parsedApps: ApplicationCard[] = JSON.parse(savedApps);
+        const nonDemoApps = parsedApps.filter(app => !['app-1', 'app-2', 'app-3'].includes(app.id));
+        setApplications(nonDemoApps);
+        localStorage.setItem('gsh_applications', JSON.stringify(nonDemoApps));
+      }
 
+      // 6. Clean out any old demo documents
       const savedDocs = localStorage.getItem('gsh_documents');
-      if (savedDocs) setDocuments(JSON.parse(savedDocs));
+      if (savedDocs) {
+        const parsedDocs: DocumentItem[] = JSON.parse(savedDocs);
+        const nonDemoDocs = parsedDocs.filter(doc => !['doc-1', 'doc-2', 'doc-3'].includes(doc.id));
+        setDocuments(nonDemoDocs);
+        localStorage.setItem('gsh_documents', JSON.stringify(nonDemoDocs));
+      }
 
       const savedNews = localStorage.getItem('gsh_seen_news');
       if (savedNews) setSeenNewsIds(JSON.parse(savedNews));
@@ -325,6 +286,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const addCustomApplication = (card: ApplicationCard) => {
+    setApplications((prev) => {
+      const next = [card, ...prev];
+      localStorage.setItem('gsh_applications', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const updateApplicationStatus = (id: string, status: ApplicationStatus) => {
     setApplications((prev) => {
       const next = prev.map((app) => (app.id === id ? { ...app, status, updatedAt: 'Just now' } : app));
@@ -394,6 +363,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isPinned,
         applications,
         addToTracker,
+        addCustomApplication,
         updateApplicationStatus,
         deleteApplication,
         documents,
