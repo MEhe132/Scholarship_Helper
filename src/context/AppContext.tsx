@@ -1,19 +1,24 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { UserProfile, ApplicationCard, DocumentItem, Authority, DuplicateNotice, ApplicationStatus, AuthUser } from '../lib/types';
+import { UserProfile, ApplicationCard, DocumentItem, Authority, DuplicateNotice, ApplicationStatus, AuthUser, RegisteredAccount } from '../lib/types';
 import { authoritiesData } from '../data/authoritiesData';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface AppContextType {
   currentUser: AuthUser | null;
+  registeredAccounts: RegisteredAccount[];
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   authModalMode: 'login' | 'signup';
   setAuthModalMode: (mode: 'login' | 'signup') => void;
-  loginWithGoogle: () => Promise<void>;
+  prefilledIdentifier: string;
+  setPrefilledIdentifier: (id: string) => void;
+
+  registerWithGoogle: (email: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithPassword: (identifier: string, email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (email?: string) => Promise<{ success: boolean; error?: string; registeredEmails?: string[] }>;
   loginWithPassword: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  registerWithPassword: (email: string, password: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
 
   userProfile: UserProfile;
@@ -35,6 +40,27 @@ interface AppContextType {
   activeDuplicateModal: { title: string; notices: DuplicateNotice[] } | null;
   setActiveDuplicateModal: (modal: { title: string; notices: DuplicateNotice[] } | null) => void;
 }
+
+const initialRegisteredAccounts: RegisteredAccount[] = [
+  {
+    id: 'user-demo-google',
+    identifier: 'mhbhuiyan132@gmail.com',
+    email: 'mhbhuiyan132@gmail.com',
+    fullName: 'Mehedi Hasan',
+    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+    provider: 'google',
+    createdAt: '2026-11-01T10:00:00Z',
+  },
+  {
+    id: 'user-demo-id',
+    identifier: 'cs_student',
+    email: 'student@cs.university.edu',
+    fullName: 'CS Undergrad (3rd Year)',
+    password: 'password123',
+    provider: 'email',
+    createdAt: '2026-11-01T11:00:00Z',
+  }
+];
 
 const defaultProfile: UserProfile = {
   id: 'user-demo-1',
@@ -126,8 +152,10 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [registeredAccounts, setRegisteredAccounts] = useState<RegisteredAccount[]>(initialRegisteredAccounts);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login');
+  const [prefilledIdentifier, setPrefilledIdentifier] = useState('');
 
   const [userProfile, setUserProfile] = useState<UserProfile>(defaultProfile);
   const [pinnedShortCodes, setPinnedShortCodes] = useState<string[]>(['DAAD', 'EMJM']);
@@ -140,6 +168,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Load from localStorage on client mount
   useEffect(() => {
     try {
+      const savedRegistered = localStorage.getItem('gsh_registered_accounts');
+      if (savedRegistered) {
+        setRegisteredAccounts(JSON.parse(savedRegistered));
+      } else {
+        localStorage.setItem('gsh_registered_accounts', JSON.stringify(initialRegisteredAccounts));
+      }
+
       const savedUser = localStorage.getItem('gsh_auth_user');
       if (savedUser) {
         setCurrentUser(JSON.parse(savedUser));
@@ -202,7 +237,110 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginWithGoogle = async () => {
+  // STEP 1: SIGN UP WITH GOOGLE (Registers the account, does NOT auto-login)
+  const registerWithGoogle = async (email: string, fullName: string) => {
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Please enter a valid Google email address.' };
+    }
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = fullName.trim() || cleanEmail.split('@')[0];
+
+    // Check if already registered
+    const exists = registeredAccounts.some(acc => acc.email.toLowerCase() === cleanEmail);
+    if (exists) {
+      return { 
+        success: false, 
+        error: `An account for ${cleanEmail} is already registered! Please sign in with Google directly.` 
+      };
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      // In Supabase, OAuth sign in will create the account
+      return { success: true };
+    }
+
+    // Register new Google account
+    const newGoogleAcc: RegisteredAccount = {
+      id: `google-${Date.now()}`,
+      identifier: cleanEmail,
+      email: cleanEmail,
+      fullName: cleanName,
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+      provider: 'google',
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [newGoogleAcc, ...registeredAccounts];
+    setRegisteredAccounts(updated);
+    localStorage.setItem('gsh_registered_accounts', JSON.stringify(updated));
+
+    // Notice: We DO NOT set currentUser here!
+    // The user must now sign in using their registered account.
+    return { success: true };
+  };
+
+  // STEP 1: SIGN UP WITH PASSWORD (Registers the account, does NOT auto-login)
+  const registerWithPassword = async (identifier: string, email: string, password: string, fullName: string) => {
+    if (!identifier || !password || !fullName) {
+      return { success: false, error: 'All fields (Full Name, User ID/Email, and Password) are required.' };
+    }
+
+    if (password.length < 6) {
+      return { success: false, error: 'Password must be at least 6 characters.' };
+    }
+
+    const cleanId = identifier.trim().toLowerCase();
+    const cleanEmail = (email || identifier).trim().toLowerCase();
+    const cleanName = fullName.trim();
+
+    // Check if already registered
+    const exists = registeredAccounts.some(
+      acc => acc.identifier.toLowerCase() === cleanId || acc.email.toLowerCase() === cleanEmail
+    );
+
+    if (exists) {
+      return { 
+        success: false, 
+        error: 'An account with this User ID or Email is already registered. Please sign in.' 
+      };
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: password,
+        options: {
+          data: { full_name: cleanName, user_id: cleanId },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    }
+
+    // Register new User ID account
+    const newAccount: RegisteredAccount = {
+      id: `user-${Date.now()}`,
+      identifier: cleanId,
+      email: cleanEmail.includes('@') ? cleanEmail : `${cleanId}@student.university.edu`,
+      fullName: cleanName,
+      password: password,
+      provider: 'email',
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [newAccount, ...registeredAccounts];
+    setRegisteredAccounts(updated);
+    localStorage.setItem('gsh_registered_accounts', JSON.stringify(updated));
+
+    // Notice: We DO NOT set currentUser here!
+    return { success: true };
+  };
+
+  // STEP 2: LOG IN WITH GOOGLE (Must be already signed up!)
+  const loginWithGoogle = async (email?: string) => {
     if (isSupabaseConfigured() && supabase) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -210,41 +348,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
           redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
         },
       });
-      if (error) {
-        throw error;
-      }
-      return;
+      if (error) return { success: false, error: error.message };
+      return { success: true };
     }
 
-    // Demo Mode Google Login Simulation
-    const demoGoogleUser: AuthUser = {
-      id: `google-${Date.now()}`,
-      email: 'mhbhuiyan132@gmail.com',
-      fullName: 'Mehedi Hasan',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
+    // Check registered Google accounts
+    const googleAccounts = registeredAccounts.filter(acc => acc.provider === 'google');
+
+    if (googleAccounts.length === 0) {
+      return { 
+        success: false, 
+        error: 'No registered Google accounts found! Please create an account via Sign Up first.' 
+      };
+    }
+
+    let targetAccount = googleAccounts[0];
+    if (email) {
+      const found = googleAccounts.find(acc => acc.email.toLowerCase() === email.trim().toLowerCase());
+      if (!found) {
+        return {
+          success: false,
+          error: `Google account ${email} is not registered yet. Please sign up first.`,
+          registeredEmails: googleAccounts.map(a => a.email),
+        };
+      }
+      targetAccount = found;
+    }
+
+    const authedUser: AuthUser = {
+      id: targetAccount.id,
+      email: targetAccount.email,
+      fullName: targetAccount.fullName,
+      avatarUrl: targetAccount.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=faces',
       provider: 'google',
-      createdAt: new Date().toISOString(),
+      createdAt: targetAccount.createdAt,
     };
 
-    setCurrentUser(demoGoogleUser);
-    localStorage.setItem('gsh_auth_user', JSON.stringify(demoGoogleUser));
+    setCurrentUser(authedUser);
+    localStorage.setItem('gsh_auth_user', JSON.stringify(authedUser));
+    updateProfile({ fullName: targetAccount.fullName });
 
-    // Also update profile name if default
-    updateProfile({ fullName: demoGoogleUser.fullName });
+    return { success: true, registeredEmails: googleAccounts.map(a => a.email) };
   };
 
+  // STEP 2: LOG IN WITH USER ID / EMAIL & PASSWORD (Must be already signed up!)
   const loginWithPassword = async (identifier: string, password: string) => {
     if (!identifier || !password) {
-      return { success: false, error: 'Please enter both User ID/Email and password.' };
+      return { success: false, error: 'Please enter both your User ID / Email and password.' };
     }
 
-    if (password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters.' };
-    }
+    const cleanId = identifier.trim().toLowerCase();
 
     if (isSupabaseConfigured() && supabase) {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: identifier,
+        email: cleanId,
         password: password,
       });
 
@@ -255,8 +412,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (data.user) {
         const authedUser: AuthUser = {
           id: data.user.id,
-          email: data.user.email || identifier,
-          fullName: data.user.user_metadata?.full_name || identifier.split('@')[0],
+          email: data.user.email || cleanId,
+          fullName: data.user.user_metadata?.full_name || cleanId.split('@')[0],
           provider: 'email',
           createdAt: data.user.created_at,
         };
@@ -266,71 +423,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { success: true };
     }
 
-    // Demo Mode Password Login Simulation
-    const namePart = identifier.includes('@') ? identifier.split('@')[0] : identifier;
-    const demoUser: AuthUser = {
-      id: `user-${Date.now()}`,
-      email: identifier.includes('@') ? identifier : `${identifier}@student.university.edu`,
-      fullName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
-      provider: 'email',
-      createdAt: new Date().toISOString(),
+    // Verify against registered accounts
+    const account = registeredAccounts.find(
+      acc => acc.identifier.toLowerCase() === cleanId || acc.email.toLowerCase() === cleanId
+    );
+
+    if (!account) {
+      return { 
+        success: false, 
+        error: `No account found for "${identifier}". Please create an account via Sign Up first.` 
+      };
+    }
+
+    if (account.password && account.password !== password) {
+      return { success: false, error: 'Incorrect password. Please verify and try again.' };
+    }
+
+    const authedUser: AuthUser = {
+      id: account.id,
+      email: account.email,
+      fullName: account.fullName,
+      avatarUrl: account.avatarUrl,
+      provider: account.provider,
+      createdAt: account.createdAt,
     };
 
-    setCurrentUser(demoUser);
-    localStorage.setItem('gsh_auth_user', JSON.stringify(demoUser));
-    updateProfile({ fullName: demoUser.fullName });
-
-    return { success: true };
-  };
-
-  const registerWithPassword = async (email: string, password: string, fullName: string) => {
-    if (!email || !password || !fullName) {
-      return { success: false, error: 'All fields are required for sign up.' };
-    }
-
-    if (password.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters.' };
-    }
-
-    if (isSupabaseConfigured() && supabase) {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: fullName },
-        },
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      if (data.user) {
-        const authedUser: AuthUser = {
-          id: data.user.id,
-          email: data.user.email || email,
-          fullName: fullName,
-          provider: 'email',
-          createdAt: data.user.created_at,
-        };
-        setCurrentUser(authedUser);
-        localStorage.setItem('gsh_auth_user', JSON.stringify(authedUser));
-      }
-      return { success: true };
-    }
-
-    // Demo Mode Registration
-    const newUser: AuthUser = {
-      id: `user-${Date.now()}`,
-      email,
-      fullName,
-      provider: 'email',
-      createdAt: new Date().toISOString(),
-    };
-
-    setCurrentUser(newUser);
-    localStorage.setItem('gsh_auth_user', JSON.stringify(newUser));
-    updateProfile({ fullName });
+    setCurrentUser(authedUser);
+    localStorage.setItem('gsh_auth_user', JSON.stringify(authedUser));
+    updateProfile({ fullName: account.fullName });
 
     return { success: true };
   };
@@ -434,13 +554,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider
       value={{
         currentUser,
+        registeredAccounts,
         isAuthModalOpen,
         setIsAuthModalOpen,
         authModalMode,
         setAuthModalMode,
+        prefilledIdentifier,
+        setPrefilledIdentifier,
+
+        registerWithGoogle,
+        registerWithPassword,
         loginWithGoogle,
         loginWithPassword,
-        registerWithPassword,
         logout,
 
         userProfile,

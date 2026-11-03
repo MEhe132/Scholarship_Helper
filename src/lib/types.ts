@@ -133,3 +133,14 @@ export interface AuthUser {
   provider: 'google' | 'email';
   createdAt: string;
 }
+
+export interface RegisteredAccount {
+  id: string;
+  identifier: string; // username / UID or email
+  email: string;
+  fullName: string;
+  password?: string;
+  avatarUrl?: string;
+  provider: 'google' | 'email';
+  createdAt: string;
+}
